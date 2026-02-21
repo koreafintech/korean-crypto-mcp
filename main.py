@@ -17,10 +17,24 @@ import uvicorn
 # ── MCP 서버 ──────────────────────────────────────────
 mcp = FastMCP("korean-crypto")
 
-UPBIT   = "https://api.upbit.com/v1"
-BITHUMB = "https://api.bithumb.com/public"
-BINANCE = "https://api.binance.com/api/v3"
-FX_URL  = "https://open.er-api.com/v6/latest/USD"
+UPBIT     = "https://api.upbit.com/v1"
+BITHUMB   = "https://api.bithumb.com/public"
+COINGECKO = "https://api.coingecko.com/api/v3"
+FX_URL    = "https://open.er-api.com/v6/latest/USD"
+
+# 코인 심볼 → CoinGecko ID 매핑
+COINGECKO_IDS = {
+    "BTC": "bitcoin", "ETH": "ethereum", "XRP": "ripple",
+    "SOL": "solana", "ADA": "cardano", "DOGE": "dogecoin",
+    "AVAX": "avalanche-2", "DOT": "polkadot", "MATIC": "matic-network",
+    "LINK": "chainlink", "UNI": "uniswap", "ATOM": "cosmos",
+    "LTC": "litecoin", "BCH": "bitcoin-cash", "ETC": "ethereum-classic",
+    "NEAR": "near", "APT": "aptos", "ARB": "arbitrum",
+    "OP": "optimism", "SUI": "sui", "TRX": "tron",
+    "SHIB": "shiba-inu", "PEPE": "pepe", "BNB": "binancecoin",
+    "TON": "the-open-network", "STX": "blockstack",
+    "SAND": "the-sandbox", "MANA": "decentraland",
+}
 
 
 async def get(url, params=None):
@@ -90,17 +104,34 @@ async def get_candles(market: str, interval: str = "days", count: int = 10) -> s
 
 @mcp.tool()
 async def get_kimchi_premium(coin: str) -> str:
-    """김치프리미엄 계산. 업비트 vs 바이낸스. 예: BTC"""
+    """김치프리미엄 계산. 업비트 vs CoinGecko(글로벌). 예: BTC"""
     coin = coin.upper()
+
+    # 업비트 KRW 가격
     upbit_data = await get(f"{UPBIT}/ticker", params={"markets": f"KRW-{coin}"})
     krw_price = upbit_data[0]["trade_price"]
 
-    try:
-        binance_data = await get(f"{BINANCE}/ticker/price", params={"symbol": f"{coin}USDT"})
-        usd_price = float(binance_data["price"])
-    except Exception:
-        return f"바이낸스에 {coin}USDT 마켓이 없습니다."
+    # CoinGecko USD 가격
+    cg_id = COINGECKO_IDS.get(coin)
+    if not cg_id:
+        # 매핑에 없으면 심볼로 검색 시도
+        try:
+            search = await get(f"{COINGECKO}/search", params={"query": coin})
+            coins = search.get("coins", [])
+            if not coins:
+                return f"CoinGecko에서 {coin} 정보를 찾을 수 없습니다."
+            cg_id = coins[0]["id"]
+        except Exception:
+            return f"CoinGecko에서 {coin} 정보를 가져오지 못했습니다."
 
+    try:
+        cg_data = await get(f"{COINGECKO}/simple/price",
+                            params={"ids": cg_id, "vs_currencies": "usd"})
+        usd_price = cg_data[cg_id]["usd"]
+    except Exception:
+        return f"CoinGecko에서 {coin}({cg_id}) 가격을 가져오지 못했습니다."
+
+    # 환율
     try:
         fx = await get(FX_URL)
         usd_krw = fx["rates"]["KRW"]
@@ -117,12 +148,12 @@ async def get_kimchi_premium(coin: str) -> str:
 
     return (
         f"{emoji} {coin} 김치프리미엄\n\n"
-        f"  업비트:         {krw_price:>15,.0f} 원\n"
-        f"  바이낸스(USDT): {usd_price:>15,.4f} $\n"
-        f"  USD/KRW 환율:   {usd_krw:>15,.2f} 원\n"
-        f"  바이낸스 환산:  {krw_equiv:>15,.0f} 원\n"
+        f"  업비트:            {krw_price:>15,.0f} 원\n"
+        f"  CoinGecko(USD):   {usd_price:>15,.4f} $\n"
+        f"  USD/KRW 환율:      {usd_krw:>15,.2f} 원\n"
+        f"  글로벌 환산가:     {krw_equiv:>15,.0f} 원\n"
         f"  ─────────────────────────────────\n"
-        f"  김치프리미엄:   {pct:>+14.2f} %\n\n"
+        f"  김치프리미엄:      {pct:>+14.2f} %\n\n"
         f"  📌 {comment}"
     )
 
