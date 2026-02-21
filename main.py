@@ -339,6 +339,94 @@ async def root():
 async def health():
     return {"status": "ok", "version": "4.0.0"}
 
+
+# ── Smithery / MCP HTTP 엔드포인트 ──────────────────
+@app.get("/mcp")
+async def mcp_info():
+    """Smithery MCP 엔드포인트 — 서버 정보 및 툴 목록"""
+    return {
+        "protocol": "mcp",
+        "version": "2024-11-05",
+        "name": "korean-crypto-mcp",
+        "description": "한국 암호화폐 실시간 데이터 (업비트, 김치프리미엄, 빗썸)",
+        "tools": [
+            {"name": "get_price",
+             "description": "업비트 실시간 현재가. 예: KRW-BTC",
+             "inputSchema": {"type": "object", "properties": {
+                 "market": {"type": "string", "description": "마켓 코드. 예: KRW-BTC"}},
+                 "required": ["market"]}},
+            {"name": "get_kimchi_premium",
+             "description": "김치프리미엄 계산 (업비트 vs CoinGecko). 예: BTC",
+             "inputSchema": {"type": "object", "properties": {
+                 "coin": {"type": "string", "description": "코인 심볼. 예: BTC"}},
+                 "required": ["coin"]}},
+            {"name": "get_top_movers",
+             "description": "24h 상승/하락 상위 코인",
+             "inputSchema": {"type": "object", "properties": {
+                 "direction": {"type": "string", "enum": ["up", "down"], "default": "up"},
+                 "limit": {"type": "integer", "default": 10}}}},
+            {"name": "compare_exchanges",
+             "description": "업비트 vs 빗썸 가격 비교. 예: BTC",
+             "inputSchema": {"type": "object", "properties": {
+                 "coin": {"type": "string", "description": "코인 심볼. 예: BTC"}},
+                 "required": ["coin"]}},
+            {"name": "get_orderbook",
+             "description": "업비트 호가창. 예: KRW-BTC",
+             "inputSchema": {"type": "object", "properties": {
+                 "market": {"type": "string", "description": "마켓 코드. 예: KRW-BTC"}},
+                 "required": ["market"]}},
+            {"name": "get_candles",
+             "description": "업비트 캔들 데이터",
+             "inputSchema": {"type": "object", "properties": {
+                 "market": {"type": "string"},
+                 "interval": {"type": "string", "default": "days"},
+                 "count": {"type": "integer", "default": 10}},
+                 "required": ["market"]}},
+            {"name": "get_markets",
+             "description": "업비트 마켓 목록",
+             "inputSchema": {"type": "object", "properties": {
+                 "quote": {"type": "string", "default": "KRW"}}}}
+        ]
+    }
+
+
+@app.post("/mcp")
+async def mcp_call(request: dict):
+    """Smithery MCP 툴 호출 엔드포인트"""
+    method = request.get("method", "")
+    params = request.get("params", {})
+
+    # tools/list
+    if method == "tools/list":
+        info = await mcp_info()
+        return {"tools": info["tools"]}
+
+    # tools/call
+    if method == "tools/call":
+        tool_name = params.get("name", "")
+        args = params.get("arguments", {})
+        try:
+            dispatch = {
+                "get_price":          lambda: get_price(args.get("market", "KRW-BTC")),
+                "get_kimchi_premium": lambda: get_kimchi_premium(args.get("coin", "BTC")),
+                "get_top_movers":     lambda: get_top_movers(args.get("direction", "up"),
+                                                              int(args.get("limit", 10))),
+                "compare_exchanges":  lambda: compare_exchanges(args.get("coin", "BTC")),
+                "get_orderbook":      lambda: get_orderbook(args.get("market", "KRW-BTC")),
+                "get_candles":        lambda: get_candles(args.get("market", "KRW-BTC"),
+                                                           args.get("interval", "days"),
+                                                           int(args.get("count", 10))),
+                "get_markets":        lambda: get_markets(args.get("quote", "KRW")),
+            }
+            if tool_name not in dispatch:
+                raise HTTPException(400, f"Unknown tool: {tool_name}")
+            result = await dispatch[tool_name]()
+            return {"content": [{"type": "text", "text": result}]}
+        except Exception as e:
+            raise HTTPException(500, str(e))
+
+    raise HTTPException(400, f"Unknown method: {method}")
+
 @app.get("/price/{market}")
 async def api_price(market: str):
     return {"result": await get_price(market)}
@@ -369,7 +457,6 @@ async def api_top_movers(direction: str = "up", limit: int = 10):
 
 
 # ── 텔레그램 관리 API ────────────────────────────────
-@app.get("/alert/test") 
 @app.post("/alert/test")
 async def alert_test():
     """텔레그램 연결 테스트"""
