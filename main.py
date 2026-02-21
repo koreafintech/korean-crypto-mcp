@@ -392,19 +392,39 @@ async def mcp_info():
 
 @app.post("/mcp")
 async def mcp_call(request: dict):
-    """Smithery MCP 툴 호출 엔드포인트"""
+    """Smithery 표준 JSON-RPC MCP 엔드포인트"""
+    jsonrpc_id = request.get("id", 1)
     method = request.get("method", "")
-    params = request.get("params", {})
+    params = request.get("params", {}) or {}
 
-    # tools/list
+    def ok(result):
+        return {"jsonrpc": "2.0", "id": jsonrpc_id, "result": result}
+
+    def err(code, message):
+        return {"jsonrpc": "2.0", "id": jsonrpc_id,
+                "error": {"code": code, "message": message}}
+
+    # ── initialize ───────────────────────────────────
+    if method == "initialize":
+        return ok({
+            "protocolVersion": "2024-11-05",
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "korean-crypto-mcp", "version": "4.0.0"}
+        })
+
+    # ── notifications (응답 불필요) ──────────────────
+    if method.startswith("notifications/"):
+        return {}
+
+    # ── tools/list ───────────────────────────────────
     if method == "tools/list":
         info = await mcp_info()
-        return {"tools": info["tools"]}
+        return ok({"tools": info["tools"]})
 
-    # tools/call
+    # ── tools/call ───────────────────────────────────
     if method == "tools/call":
         tool_name = params.get("name", "")
-        args = params.get("arguments", {})
+        args = params.get("arguments", {}) or {}
         try:
             dispatch = {
                 "get_price":          lambda: get_price(args.get("market", "KRW-BTC")),
@@ -419,13 +439,17 @@ async def mcp_call(request: dict):
                 "get_markets":        lambda: get_markets(args.get("quote", "KRW")),
             }
             if tool_name not in dispatch:
-                raise HTTPException(400, f"Unknown tool: {tool_name}")
+                return err(-32601, f"Unknown tool: {tool_name}")
             result = await dispatch[tool_name]()
-            return {"content": [{"type": "text", "text": result}]}
+            return ok({"content": [{"type": "text", "text": result}]})
         except Exception as e:
-            raise HTTPException(500, str(e))
+            return err(-32603, str(e))
 
-    raise HTTPException(400, f"Unknown method: {method}")
+    # ── ping ─────────────────────────────────────────
+    if method == "ping":
+        return ok({})
+
+    return err(-32601, f"Method not found: {method}")
 
 @app.get("/price/{market}")
 async def api_price(market: str):
