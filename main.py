@@ -369,6 +369,7 @@ async def api_top_movers(direction: str = "up", limit: int = 10):
 
 
 # ── 텔레그램 관리 API ────────────────────────────────
+@app.get("/alert/test") 
 @app.post("/alert/test")
 async def alert_test():
     """텔레그램 연결 테스트"""
