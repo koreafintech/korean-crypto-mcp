@@ -1,0 +1,37 @@
+# smithery.yaml — GitHub 레포 루트에 추가
+name: korean-crypto-mcp
+displayName: Korean Crypto MCP
+description: >
+  한국 암호화폐 실시간 데이터 서버.
+  업비트 현재가, 김치프리미엄, 상승/하락 TOP, 
+  업비트 vs 빗썸 비교를 제공합니다.
+version: 4.0.0
+license: MIT
+
+server:
+  type: http
+  url: https://web-production-fa47d.up.railway.app
+
+tools:
+  - name: get_price
+    description: 업비트 실시간 현재가. 예: KRW-BTC
+  - name: get_kimchi_premium
+    description: 김치프리미엄 계산 (업비트 vs CoinGecko)
+  - name: get_top_movers
+    description: 24h 상승/하락 상위 코인
+  - name: compare_exchanges
+    description: 업비트 vs 빗썸 가격 비교
+  - name: get_orderbook
+    description: 업비트 호가창
+  - name: get_candles
+    description: 업비트 캔들 차트 데이터
+  - name: get_markets
+    description: 업비트 마켓 목록
+
+tags:
+  - crypto
+  - korea
+  - upbit
+  - kimchi-premium
+  - finance
+  - real-time
