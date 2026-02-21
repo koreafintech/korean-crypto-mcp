@@ -1,63 +1,55 @@
-# Korean Crypto MCP Server v3
+# Korean Crypto MCP Server
 
-업비트 + 빗썸 + 김치프리미엄 실시간 데이터 API
+Real-time Korean cryptocurrency data via Upbit exchange — kimchi premium, live prices, top movers, and exchange comparison.
 
-## 모드
+## Tools
 
-| 모드 | 설명 | 실행 |
-|------|------|------|
-| `http` (기본) | Railway/A2A HTTP 서버 | `python main.py` |
-| `stdio` | Claude Desktop MCP | `RUN_MODE=stdio python main.py` |
+| Tool | Description |
+|------|-------------|
+| `get_price` | Real-time price from Upbit. e.g. `KRW-BTC` |
+| `get_kimchi_premium` | Kimchi premium % (Upbit vs CoinGecko global price) |
+| `get_top_movers` | Top gaining/losing coins in last 24h |
+| `compare_exchanges` | Upbit vs Bithumb price comparison |
+| `get_orderbook` | Live order book for any KRW market |
+| `get_candles` | OHLCV candle data (minutes/hours/days) |
+| `get_markets` | List all available markets (KRW/BTC/USDT) |
 
-## 엔드포인트
+## Example Usage
 
-| Method | Path | 설명 |
-|--------|------|------|
-| GET | `/` | 서버 정보 |
-| GET | `/health` | 헬스체크 |
-| GET | `/.well-known/agent.json` | A2A Agent Card |
-| POST | `/tasks/send` | A2A 태스크 처리 |
-| GET | `/price/{market}` | 현재가 (예: `KRW-BTC`) |
-| GET | `/markets?quote=KRW` | 마켓 목록 |
-| GET | `/orderbook/{market}` | 호가창 |
-| GET | `/candles/{market}` | 캔들 데이터 |
-| GET | `/kimchi/{coin}` | 김치프리미엄 |
-| GET | `/compare/{coin}` | 업비트 vs 빗썸 비교 |
-| GET | `/top-movers?direction=up` | 상승/하락 TOP |
+```
+# Get Bitcoin kimchi premium
+get_kimchi_premium(coin="BTC")
+→ 🌶️ BTC Kimchi Premium: +2.34%
 
-## Railway 배포
+# Top 10 gainers today
+get_top_movers(direction="up", limit=10)
 
-1. GitHub에 push
-2. Railway → New Project → GitHub Repo 연결
-3. 자동 배포 완료
-
-## Claude Desktop 설정 (로컬)
-
-```json
-{
-  "mcpServers": {
-    "korean-crypto": {
-      "command": "python",
-      "args": ["path/to/main.py"],
-      "env": {
-        "RUN_MODE": "stdio"
-      }
-    }
-  }
-}
+# Compare BTC price between exchanges
+compare_exchanges(coin="BTC")
+→ Upbit: 99,800,000 KRW / Bithumb: 99,750,000 KRW
 ```
 
-## A2A 사용 예시
+## What is Kimchi Premium?
+
+The "kimchi premium" refers to the price difference between Korean crypto exchanges (like Upbit) and global exchanges. When Korean prices are higher than global prices, it's a positive kimchi premium. This server calculates it in real-time using Upbit vs CoinGecko pricing.
+
+## Live Server
+
+Hosted 24/7 on Railway:
+```
+https://web-production-fa47d.up.railway.app
+```
+
+## Connect via Smithery
 
 ```bash
-# 현재가 조회
-curl https://your-app.railway.app/price/KRW-BTC
-
-# 김치프리미엄
-curl https://your-app.railway.app/kimchi/BTC
-
-# A2A 태스크
-curl -X POST https://your-app.railway.app/tasks/send \
-  -H "Content-Type: application/json" \
-  -d '{"id":"1","skillId":"get_kimchi_premium","metadata":{"coin":"BTC"}}'
+smithery install koreafintech/korean-crypto-mcp
 ```
+
+## Features
+
+- ✅ Real-time Upbit data (100+ KRW markets)
+- ✅ Kimchi premium calculation with live FX rates
+- ✅ Upbit vs Bithumb arbitrage comparison  
+- ✅ A2A Agent Card compatible
+- ✅ Telegram alert bot (configurable thresholds)
